@@ -2,29 +2,39 @@
 
 import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { AddTracksToAlbumModal } from "@/components/add-tracks-to-album-modal";
+import { CreateAlbumModal } from "@/components/create-album-modal";
 import { UploadSongForm } from "@/components/upload-song-form";
 import { TrackList } from "@/components/track-list";
 import { PlayerBar } from "@/components/player-bar";
 import { DEFAULT_ARTIST } from "@/lib/constants";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { Album } from "@/types/album";
 import { Track } from "@/types/track";
+
+type DeleteChoiceMode = "album" | "all";
 
 type LibraryViewProps = {
   userEmail: string;
   initialTracks: Track[];
+  initialAlbums: Album[];
   canManage: boolean;
 };
 
 export function LibraryView({
   userEmail,
   initialTracks,
+  initialAlbums,
   canManage
 }: LibraryViewProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const supabase = createBrowserSupabaseClient();
 
   const [tracks, setTracks] = useState<Track[]>(initialTracks);
+  const [albums, setAlbums] = useState<Album[]>(initialAlbums);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -34,7 +44,12 @@ export function LibraryView({
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
+  const [isAddTracksModalOpen, setIsAddTracksModalOpen] = useState(false);
+  const [pendingDeleteChoiceTrack, setPendingDeleteChoiceTrack] =
+    useState<Track | null>(null);
   const [repeatMode, setRepeatMode] = useState<"off" | "all">("off");
+  const selectedAlbumId = searchParams.get("album");
 
   const loadTracks = useCallback(async () => {
     setLibraryLoading(true);
@@ -56,19 +71,45 @@ export function LibraryView({
     setLibraryLoading(false);
   }, []);
 
-  const filteredTracks = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) {
-      return tracks;
+  const loadAlbums = useCallback(async () => {
+    const response = await fetch("/api/albums", {
+      method: "GET",
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      setLibraryError("Failed to load albums.");
+      return;
     }
 
+    const payload = (await response.json()) as { albums: Album[] };
+    setAlbums(payload.albums);
+  }, []);
+
+  const selectedAlbumTrackIds = useMemo(() => {
+    if (!selectedAlbumId) {
+      return [];
+    }
+    return albums.find((album) => album.id === selectedAlbumId)?.track_ids ?? [];
+  }, [albums, selectedAlbumId]);
+
+  const filteredTracks = useMemo(() => {
+    const selectedTrackSet = selectedAlbumId
+      ? new Set(selectedAlbumTrackIds)
+      : null;
+
+    const query = search.trim().toLowerCase();
     return tracks.filter((track) => {
-      return (
+      const inSelectedAlbum =
+        !selectedTrackSet || selectedTrackSet.has(track.id);
+      const inSearch =
+        !query ||
         track.title.toLowerCase().includes(query) ||
-        (track.artist || "").toLowerCase().includes(query)
-      );
+        (track.artist || "").toLowerCase().includes(query);
+
+      return inSelectedAlbum && inSearch;
     });
-  }, [search, tracks]);
+  }, [search, selectedAlbumId, selectedAlbumTrackIds, tracks]);
 
   const fetchSignedUrl = async (trackId: string) => {
     const response = await fetch(`/api/stream/${trackId}`, {
@@ -99,13 +140,14 @@ export function LibraryView({
     setLoadingTrackId(null);
   };
 
-  const handleDelete = async (track: Track) => {
-    const shouldDelete = window.confirm(
-      `Delete "${track.title}"? This will remove the song and cover file.`
-    );
-
-    if (!shouldDelete) {
-      return;
+  const deleteEverywhere = async (track: Track, skipConfirm = false) => {
+    if (!skipConfirm) {
+      const shouldDelete = window.confirm(
+        `Delete "${track.title}"? This will remove the song and cover file.`
+      );
+      if (!shouldDelete) {
+        return;
+      }
     }
 
     setDeletingTrackId(track.id);
@@ -130,14 +172,85 @@ export function LibraryView({
     }
 
     setTracks((prev) => prev.filter((item) => item.id !== track.id));
+    setAlbums((prev) =>
+      prev.map((album) => ({
+        ...album,
+        track_ids: album.track_ids.filter((id) => id !== track.id)
+      }))
+    );
     setDeletingTrackId(null);
+  };
+
+  const removeFromSelectedAlbum = async (track: Track) => {
+    if (!selectedAlbumId) {
+      return;
+    }
+
+    setDeletingTrackId(track.id);
+    setLibraryError(null);
+
+    const response = await fetch(`/api/albums/${selectedAlbumId}/tracks`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ trackId: track.id })
+    });
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      setLibraryError(payload?.error || "Failed to remove track from album.");
+      setDeletingTrackId(null);
+      return;
+    }
+
+    setAlbums((prev) =>
+      prev.map((album) =>
+        album.id === selectedAlbumId
+          ? {
+              ...album,
+              track_ids: album.track_ids.filter((id) => id !== track.id)
+            }
+          : album
+      )
+    );
+    setDeletingTrackId(null);
+  };
+
+  const handleDelete = async (track: Track) => {
+    if (selectedAlbumId && selectedAlbumTrackIds.includes(track.id)) {
+      setPendingDeleteChoiceTrack(track);
+      return;
+    }
+
+    await deleteEverywhere(track);
+  };
+
+  const handleDeleteChoice = async (mode: DeleteChoiceMode) => {
+    if (!pendingDeleteChoiceTrack) {
+      return;
+    }
+
+    const track = pendingDeleteChoiceTrack;
+    setPendingDeleteChoiceTrack(null);
+
+    if (mode === "album") {
+      await removeFromSelectedAlbum(track);
+      return;
+    }
+
+    await deleteEverywhere(track, true);
   };
 
   const activeQueue = filteredTracks.length ? filteredTracks : tracks;
   const currentTrackIndex = activeQueue.findIndex(
     (track) => track.id === currentTrack?.id
   );
-  const recentCovers = tracks.filter((track) => Boolean(track.cover_signed_url)).slice(0, 8);
+  const selectedAlbumName = selectedAlbumId
+    ? albums.find((album) => album.id === selectedAlbumId)?.name ?? "Album"
+    : "All tracks";
   const upNext = currentTrackIndex >= 0 ? activeQueue.slice(currentTrackIndex + 1, currentTrackIndex + 5) : activeQueue.slice(0, 4);
 
   const handlePlayNext = async () => {
@@ -176,45 +289,83 @@ export function LibraryView({
     router.refresh();
   };
 
+  const handleSelectAlbum = (albumId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (albumId) {
+      params.set("album", albumId);
+    } else {
+      params.delete("album");
+    }
+
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+  };
+
   return (
     <main className="min-h-screen bg-black p-3 pb-32 lg:p-4 lg:pb-32">
       <div className="mx-auto w-full max-w-[1400px]">
         <div className="grid gap-3 lg:grid-cols-[76px_minmax(0,1fr)] xl:grid-cols-[76px_minmax(0,1fr)_320px]">
           <aside className="hidden h-[calc(100vh-150px)] flex-col rounded-2xl bg-zinc-950 p-3 lg:flex">
-            <button
-              type="button"
-              className="mb-2 rounded-full bg-zinc-800 p-3 text-xs text-white"
-            >
-              Home
-            </button>
-            <button
-              type="button"
-              className="mb-3 rounded-full bg-zinc-900 p-3 text-xs text-zinc-300"
-            >
-              Lib
-            </button>
-            <div className="space-y-2 overflow-y-auto">
-              {recentCovers.map((track) => (
+            <div className="mb-2">
+              {canManage ? (
                 <button
                   type="button"
-                  key={`cover-${track.id}`}
-                  onClick={() => void handlePlay(track)}
-                  className="block w-full overflow-hidden rounded-md"
+                  onClick={() => setIsAlbumModalOpen(true)}
+                  className="w-full rounded-lg bg-zinc-900 px-2 py-2 text-center text-xs font-semibold text-zinc-200 transition hover:bg-zinc-800"
+                  aria-label="Create album"
+                  title="Create album"
                 >
-                  {track.cover_signed_url ? (
+                  +
+                </button>
+              ) : null}
+            </div>
+
+            <div className="space-y-2 overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => handleSelectAlbum(null)}
+                className={`w-full rounded-lg px-2 py-2 text-left text-xs transition ${
+                  selectedAlbumId === null
+                    ? "bg-zinc-800 text-white"
+                    : "bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
+                }`}
+              >
+                All tracks
+              </button>
+
+              {albums.map((album) => (
+                <button
+                  type="button"
+                  key={album.id}
+                  onClick={() => handleSelectAlbum(album.id)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition ${
+                    selectedAlbumId === album.id
+                      ? "bg-zinc-800"
+                      : "bg-zinc-900 hover:bg-zinc-800"
+                  }`}
+                >
+                  {album.cover_signed_url ? (
                     <Image
-                      src={track.cover_signed_url}
-                      alt={`${track.title} cover`}
-                      width={52}
-                      height={52}
-                      className="h-12 w-12 rounded-md object-cover"
+                      src={album.cover_signed_url}
+                      alt={`${album.name} cover`}
+                      width={36}
+                      height={36}
+                      className="h-9 w-9 rounded object-cover"
                       unoptimized
                     />
                   ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-md bg-zinc-800 text-zinc-400">
-                      *
+                    <div className="flex h-9 w-9 items-center justify-center rounded bg-zinc-700 text-[10px] text-zinc-300">
+                      ♪
                     </div>
                   )}
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-zinc-100">
+                      {album.name}
+                    </p>
+                    <p className="truncate text-[10px] text-zinc-400">
+                      {album.track_ids.length} tracks
+                    </p>
+                  </div>
                 </button>
               ))}
             </div>
@@ -227,7 +378,9 @@ export function LibraryView({
                   Your music
                 </p>
                 <h1 className="text-2xl font-bold text-white">Library</h1>
-                <p className="text-xs text-zinc-400">{userEmail}</p>
+                <p className="text-xs text-zinc-400">
+                  {userEmail} - {selectedAlbumName}
+                </p>
               </div>
               {canManage ? (
                 <div className="flex items-center gap-2">
@@ -288,6 +441,18 @@ export function LibraryView({
                 onDelete={handleDelete}
               />
             )}
+
+            {canManage && selectedAlbumId ? (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsAddTracksModalOpen(true)}
+                  className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-900"
+                >
+                  Add songs to album
+                </button>
+              </div>
+            ) : null}
 
             {libraryError ? (
               <p className="mt-4 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200">
@@ -379,6 +544,73 @@ export function LibraryView({
                   setIsUploadModalOpen(false);
                 }}
               />
+            </div>
+          </div>
+        ) : null}
+
+        {canManage && isAlbumModalOpen ? (
+          <CreateAlbumModal
+            tracks={tracks}
+            onClose={() => setIsAlbumModalOpen(false)}
+            onCreated={async () => {
+              await loadAlbums();
+            }}
+          />
+        ) : null}
+
+        {canManage && selectedAlbumId && isAddTracksModalOpen ? (
+          <AddTracksToAlbumModal
+            albumId={selectedAlbumId}
+            tracks={tracks}
+            existingTrackIds={selectedAlbumTrackIds}
+            onClose={() => setIsAddTracksModalOpen(false)}
+            onAdded={(trackIds) => {
+              setAlbums((prev) =>
+                prev.map((album) =>
+                  album.id === selectedAlbumId
+                    ? {
+                        ...album,
+                        track_ids: [...new Set([...album.track_ids, ...trackIds])]
+                      }
+                    : album
+                )
+              );
+            }}
+          />
+        ) : null}
+
+        {pendingDeleteChoiceTrack ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-black p-4 shadow-2xl">
+              <h3 className="text-base font-semibold text-zinc-100">
+                Delete track
+              </h3>
+              <p className="mt-2 text-sm text-zinc-300">
+                &quot;{pendingDeleteChoiceTrack.title}&quot; is in this album. Choose what to do:
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteChoice("album")}
+                  className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-100 hover:bg-zinc-900"
+                >
+                  Remove from album
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteChoice("all")}
+                  className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-black hover:bg-zinc-300"
+                >
+                  Delete everywhere
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingDeleteChoiceTrack(null)}
+                  className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         ) : null}

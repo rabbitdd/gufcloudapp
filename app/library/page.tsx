@@ -3,6 +3,7 @@ import { LibraryView } from "@/components/library-view";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export default async function LibraryPage() {
+
   const supabase = await createServerSupabaseClient();
   const {
     data: { user }
@@ -33,10 +34,35 @@ export default async function LibraryPage() {
     })
   );
 
+  const { data: albums } = await supabase
+    .from("albums")
+    .select("id,name,cover_storage_path,owner_id,created_at,album_tracks(track_id)")
+    .order("created_at", { ascending: false });
+
+  const albumsWithCoverUrl = await Promise.all(
+    (albums ?? []).map(async (album) => {
+      const trackIds = (album.album_tracks ?? []).map((row) => row.track_id);
+      if (!album.cover_storage_path) {
+        return { ...album, cover_signed_url: null, track_ids: trackIds };
+      }
+
+      const { data } = await supabase.storage
+        .from("songs")
+        .createSignedUrl(album.cover_storage_path, 60 * 60);
+
+      return {
+        ...album,
+        cover_signed_url: data?.signedUrl ?? null,
+        track_ids: trackIds
+      };
+    })
+  );
+
   return (
     <LibraryView
       userEmail={user.email ?? "Signed in user"}
       initialTracks={tracksWithCoverUrl}
+      initialAlbums={albumsWithCoverUrl}
       canManage
     />
   );

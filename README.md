@@ -11,6 +11,8 @@ Minimal web-native music library MVP built with:
 - Guest page (`/guest`) for listen-only access without auth
 - Protected library page (`/library`) for authenticated users only
 - Shared tracks library for all authenticated users
+- Albums: create album with name + cover and attach existing tracks
+- Add songs to selected album from a dedicated popup action on album view
 - Upload flow:
   1. upload audio file to private `songs` bucket (`tracks/<uuid>-<safe-filename>`)
   2. optional cover upload to private `songs` bucket (`covers/<uuid>-<safe-filename>`)
@@ -27,11 +29,14 @@ Minimal web-native music library MVP built with:
 - `app/login/page.tsx`
 - `app/library/page.tsx`
 - `app/guest/page.tsx`
+- `app/api/albums/route.ts`
 - `app/api/tracks/route.ts`
 - `app/api/tracks/[id]/route.ts`
 - `app/api/stream/[id]/route.ts`
 - `components/login-form.tsx`
 - `components/upload-song-form.tsx`
+- `components/create-album-modal.tsx`
+- `components/add-tracks-to-album-modal.tsx`
 - `components/track-list.tsx`
 - `components/player-bar.tsx`
 - `components/library-view.tsx`
@@ -40,10 +45,13 @@ Minimal web-native music library MVP built with:
 - `lib/supabase/middleware.ts`
 - `proxy.ts`
 - `types/track.ts`
+- `types/album.ts`
 - `supabase/migrations/001_init_tracks.sql`
 - `supabase/migrations/002_add_track_cover.sql`
 - `supabase/migrations/003_allow_track_delete.sql`
 - `supabase/migrations/004_guest_read_access.sql`
+- `supabase/migrations/005_albums.sql`
+- `supabase/migrations/006_album_track_delete_policy.sql`
 
 ## Local setup
 
@@ -84,6 +92,8 @@ Open Supabase SQL editor and run:
 - `supabase/migrations/002_add_track_cover.sql` (safe to run after 001)
 - `supabase/migrations/003_allow_track_delete.sql` (safe to run after 002)
 - `supabase/migrations/004_guest_read_access.sql` (safe to run after 003)
+- `supabase/migrations/005_albums.sql` (safe to run after 004)
+- `supabase/migrations/006_album_track_delete_policy.sql` (safe to run after 005)
 
 This creates:
 - private storage bucket `songs`
@@ -94,6 +104,8 @@ This creates:
 - DB and storage policies
 - uploader-only delete policies for tracks and files
 - guest read policies for tracks and storage objects
+- album tables and policies (with album cover uploads)
+- delete policy for removing tracks from own albums
 
 ### 2) Confirm bucket privacy
 
@@ -120,6 +132,9 @@ If email confirmation is enabled, users must confirm email before first sign-in.
    - verify the same shared library is visible
    - verify playback works for previously uploaded tracks
 9. Open `/guest` and verify you can listen but cannot upload/delete.
+10. Create an album from the left sidebar (+), pick tracks, and verify filtering works.
+11. Select an album and click **Add songs to album** to attach tracks from popup.
+12. In selected album view, delete a track and choose between album-only removal or full delete.
 
 ## Notes
 

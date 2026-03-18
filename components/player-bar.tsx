@@ -83,8 +83,30 @@ export function PlayerBar({
       return;
     }
 
-    audioRef.current.load();
-    void audioRef.current.play();
+    const audio = audioRef.current;
+    let cancelled = false;
+
+    const startPlayback = async () => {
+      try {
+        audio.load();
+        await audio.play();
+      } catch (error) {
+        // Rapid track switching can interrupt a pending play() with AbortError.
+        if (cancelled) {
+          return;
+        }
+
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      }
+    };
+
+    void startPlayback();
+
+    return () => {
+      cancelled = true;
+    };
   }, [signedUrl]);
 
   useEffect(() => {
