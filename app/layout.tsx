@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GufCloud Music MVP",
+  title: "☯ 妈妈陶 ☯",
   description: "Simple shared music library powered by Supabase."
 };
 
