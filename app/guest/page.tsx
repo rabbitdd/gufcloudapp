@@ -1,16 +1,8 @@
-import { redirect } from "next/navigation";
 import { LibraryView } from "@/components/library-view";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export default async function LibraryPage() {
+export default async function GuestPage() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
 
   const { data: tracks } = await supabase
     .from("tracks")
@@ -35,9 +27,9 @@ export default async function LibraryPage() {
 
   return (
     <LibraryView
-      userEmail={user.email ?? "Signed in user"}
+      userEmail="Guest mode (listen only)"
       initialTracks={tracksWithCoverUrl}
-      canManage
+      canManage={false}
     />
   );
 }

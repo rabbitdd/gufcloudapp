@@ -7,7 +7,8 @@ Minimal web-native music library MVP built with:
 
 ## What is implemented
 
-- Login page (`/login`) with Supabase email/password sign-in
+- Auth page (`/login`) with Supabase email/password sign-in and sign-up
+- Guest page (`/guest`) for listen-only access without auth
 - Protected library page (`/library`) for authenticated users only
 - Shared tracks library for all authenticated users
 - Upload flow:
@@ -25,6 +26,7 @@ Minimal web-native music library MVP built with:
 
 - `app/login/page.tsx`
 - `app/library/page.tsx`
+- `app/guest/page.tsx`
 - `app/api/tracks/route.ts`
 - `app/api/tracks/[id]/route.ts`
 - `app/api/stream/[id]/route.ts`
@@ -41,6 +43,7 @@ Minimal web-native music library MVP built with:
 - `supabase/migrations/001_init_tracks.sql`
 - `supabase/migrations/002_add_track_cover.sql`
 - `supabase/migrations/003_allow_track_delete.sql`
+- `supabase/migrations/004_guest_read_access.sql`
 
 ## Local setup
 
@@ -80,6 +83,7 @@ Open Supabase SQL editor and run:
 - `supabase/migrations/001_init_tracks.sql`
 - `supabase/migrations/002_add_track_cover.sql` (safe to run after 001)
 - `supabase/migrations/003_allow_track_delete.sql` (safe to run after 002)
+- `supabase/migrations/004_guest_read_access.sql` (safe to run after 003)
 
 This creates:
 - private storage bucket `songs`
@@ -89,22 +93,23 @@ This creates:
 - RLS
 - DB and storage policies
 - uploader-only delete policies for tracks and files
+- guest read policies for tracks and storage objects
 
 ### 2) Confirm bucket privacy
 
 In Supabase Dashboard -> Storage -> Buckets -> `songs`, make sure **Public bucket is OFF**.
 
-### 3) Create the two users
+### 3) Create users
 
-In Supabase Dashboard -> Authentication -> Users:
-- create two users with email/password
-- mark email as confirmed (or disable email confirmation for local testing)
+Options:
+- use app UI at `/login` in **Sign up** mode
+- or create users in Supabase Dashboard -> Authentication -> Users
 
-No signup UI is included in this MVP.
+If email confirmation is enabled, users must confirm email before first sign-in.
 
 ## How to test upload and playback
 
-1. Sign in at `/login` with one created user.
+1. Sign up (or sign in) at `/login`.
 2. Open `/library`.
 3. Upload an audio file (`.mp3`, `.m4a`, etc), optionally include a cover image.
 4. Confirm it appears in the list.
@@ -114,9 +119,11 @@ No signup UI is included in this MVP.
 8. Sign out and log in with second user:
    - verify the same shared library is visible
    - verify playback works for previously uploaded tracks
+9. Open `/guest` and verify you can listen but cannot upload/delete.
 
 ## Notes
 
 - Storage is private; playback uses signed URLs only.
+- Guest mode is read/listen only (no upload/delete actions).
 - No playlists, likes, favorites, recommendations, or admin panel in this MVP.
 - No service role key is required for current implementation.

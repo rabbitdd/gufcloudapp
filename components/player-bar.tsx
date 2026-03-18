@@ -10,9 +10,11 @@ type PlayerBarProps = {
   signedUrl: string | null;
   hasPrevious: boolean;
   hasNext: boolean;
+  repeatMode: "off" | "all";
+  onToggleRepeat: () => void;
   onPrevious: () => Promise<void> | void;
   onNext: () => Promise<void> | void;
-  onEnded: () => Promise<void> | void;
+  onEnded: (audio: HTMLAudioElement) => Promise<void> | void;
 };
 
 function formatTime(value: number) {
@@ -64,6 +66,8 @@ export function PlayerBar({
   signedUrl,
   hasPrevious,
   hasNext,
+  repeatMode,
+  onToggleRepeat,
   onPrevious,
   onNext,
   onEnded
@@ -72,6 +76,7 @@ export function PlayerBar({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const isRepeatActive = repeatMode !== "off";
 
   useEffect(() => {
     if (!audioRef.current || !signedUrl) {
@@ -94,7 +99,7 @@ export function PlayerBar({
     const onPause = () => setIsPlaying(false);
     const onTrackEnded = () => {
       setIsPlaying(false);
-      void onEnded();
+      void onEnded(audio);
     };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
@@ -174,6 +179,28 @@ export function PlayerBar({
 
         <div className="space-y-1">
           <div className="flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={onToggleRepeat}
+              className={`relative rounded-full p-2 transition ${
+                isRepeatActive
+                  ? "text-emerald-400 hover:text-emerald-300"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+              aria-label={`Repeat mode: ${repeatMode}`}
+              title={`Repeat: ${repeatMode}`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4 fill-current"
+                aria-hidden="true"
+              >
+                <path d="M17 1l4 4-4 4V6H7a3 3 0 00-3 3v1H2V9a5 5 0 015-5h10V1zM7 23l-4-4 4-4v3h10a3 3 0 003-3v-1h2v1a5 5 0 01-5 5H7v3z" />
+              </svg>
+              {isRepeatActive ? (
+                <span className="absolute bottom-0 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400" />
+              ) : null}
+            </button>
             <button
               type="button"
               onClick={() => void onPrevious()}

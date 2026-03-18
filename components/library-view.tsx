@@ -13,9 +13,14 @@ import { Track } from "@/types/track";
 type LibraryViewProps = {
   userEmail: string;
   initialTracks: Track[];
+  canManage: boolean;
 };
 
-export function LibraryView({ userEmail, initialTracks }: LibraryViewProps) {
+export function LibraryView({
+  userEmail,
+  initialTracks,
+  canManage
+}: LibraryViewProps) {
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
 
@@ -29,6 +34,7 @@ export function LibraryView({ userEmail, initialTracks }: LibraryViewProps) {
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<"off" | "all">("off");
 
   const loadTracks = useCallback(async () => {
     setLibraryLoading(true);
@@ -148,6 +154,21 @@ export function LibraryView({ userEmail, initialTracks }: LibraryViewProps) {
     await handlePlay(activeQueue[currentTrackIndex - 1]);
   };
 
+  const handleTrackEnded = async (audio: HTMLAudioElement) => {
+    if (currentTrackIndex >= 0 && currentTrackIndex + 1 < activeQueue.length) {
+      await handlePlay(activeQueue[currentTrackIndex + 1]);
+      return;
+    }
+
+    if (repeatMode === "all" && activeQueue.length > 0) {
+      await handlePlay(activeQueue[0]);
+    }
+  };
+
+  const handleToggleRepeat = () => {
+    setRepeatMode((prev) => (prev === "off" ? "all" : "off"));
+  };
+
   const handleSignOut = async () => {
     setIsSigningOut(true);
     await supabase.auth.signOut();
@@ -208,23 +229,33 @@ export function LibraryView({ userEmail, initialTracks }: LibraryViewProps) {
                 <h1 className="text-2xl font-bold text-white">Library</h1>
                 <p className="text-xs text-zinc-400">{userEmail}</p>
               </div>
-              <div className="flex items-center gap-2">
+              {canManage ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsUploadModalOpen(true)}
+                    className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-black hover:bg-zinc-300"
+                  >
+                    Upload song
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
+                    className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSigningOut ? "Signing out..." : "Sign out"}
+                  </button>
+                </div>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => setIsUploadModalOpen(true)}
-                  className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-black hover:bg-zinc-300"
+                  onClick={() => router.push("/login")}
+                  className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-900"
                 >
-                  Upload song
+                  Sign in
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={isSigningOut}
-                  className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSigningOut ? "Signing out..." : "Sign out"}
-                </button>
-              </div>
+              )}
             </header>
 
             <div className="mb-4 space-y-3">
@@ -252,6 +283,7 @@ export function LibraryView({ userEmail, initialTracks }: LibraryViewProps) {
                 currentTrackId={currentTrack?.id ?? null}
                 loadingTrackId={loadingTrackId}
                 deletingTrackId={deletingTrackId}
+                canDelete={canManage}
                 onPlay={handlePlay}
                 onDelete={handleDelete}
               />
@@ -326,7 +358,7 @@ export function LibraryView({ userEmail, initialTracks }: LibraryViewProps) {
           </aside>
         </div>
 
-        {isUploadModalOpen ? (
+        {canManage && isUploadModalOpen ? (
           <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
             <div className="w-full max-w-2xl rounded-2xl border border-zinc-800 bg-black p-4 shadow-2xl">
               <div className="mb-3 flex items-center justify-between">
@@ -358,9 +390,11 @@ export function LibraryView({ userEmail, initialTracks }: LibraryViewProps) {
           hasNext={
             currentTrackIndex >= 0 && currentTrackIndex + 1 < activeQueue.length
           }
+          repeatMode={repeatMode}
+          onToggleRepeat={handleToggleRepeat}
           onPrevious={handlePlayPrevious}
           onNext={handlePlayNext}
-          onEnded={handlePlayNext}
+          onEnded={handleTrackEnded}
         />
       </div>
     </main>

@@ -30,6 +30,13 @@ for select
 to authenticated
 using (true);
 
+drop policy if exists "Anon users can read all tracks" on public.tracks;
+create policy "Anon users can read all tracks"
+on public.tracks
+for select
+to anon
+using (true);
+
 drop policy if exists "Authenticated users can insert own tracks" on public.tracks;
 create policy "Authenticated users can insert own tracks"
 on public.tracks
@@ -43,6 +50,13 @@ create policy "Authenticated users can read song objects"
 on storage.objects
 for select
 to authenticated
+using (bucket_id = 'songs');
+
+drop policy if exists "Anon users can read song objects" on storage.objects;
+create policy "Anon users can read song objects"
+on storage.objects
+for select
+to anon
 using (bucket_id = 'songs');
 
 drop policy if exists "Authenticated users can upload song objects" on storage.objects;

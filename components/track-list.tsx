@@ -7,8 +7,9 @@ type TrackListProps = {
   currentTrackId: string | null;
   loadingTrackId: string | null;
   deletingTrackId: string | null;
+  canDelete: boolean;
   onPlay: (track: Track) => Promise<void> | void;
-  onDelete: (track: Track) => Promise<void> | void;
+  onDelete?: (track: Track) => Promise<void> | void;
 };
 
 function formatDate(value: string) {
@@ -45,6 +46,7 @@ export function TrackList({
   currentTrackId,
   loadingTrackId,
   deletingTrackId,
+  canDelete,
   onPlay,
   onDelete
 }: TrackListProps) {
@@ -67,7 +69,8 @@ export function TrackList({
           return (
             <li
               key={track.id}
-              className="flex items-center justify-between gap-3 px-4 py-3"
+              onClick={() => onPlay(track)}
+              className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 transition hover:bg-zinc-900/80"
             >
               <div className="flex min-w-0 items-center gap-3">
                 <CoverPreview
@@ -87,7 +90,10 @@ export function TrackList({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => onPlay(track)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void onPlay(track);
+                  }}
                   disabled={isLoading || isDeleting}
                   className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-zinc-300 disabled:cursor-not-allowed disabled:bg-zinc-500"
                 >
@@ -97,22 +103,27 @@ export function TrackList({
                       ? "Playing"
                       : "Play"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(track)}
-                  disabled={isDeleting || isLoading}
-                  className="rounded-full border border-zinc-700 p-2 text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label={`Delete ${track.title}`}
-                  title="Delete track"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4 fill-current"
-                    aria-hidden="true"
+                {canDelete ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void onDelete?.(track);
+                    }}
+                    disabled={isDeleting || isLoading}
+                    className="rounded-full border border-zinc-700 p-2 text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={`Delete ${track.title}`}
+                    title="Delete track"
                   >
-                    <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm-2 6h2v9H7V9zm4 0h2v9h-2V9zm4 0h2v9h-2V9z" />
-                  </svg>
-                </button>
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4 fill-current"
+                      aria-hidden="true"
+                    >
+                      <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm-2 6h2v9H7V9zm4 0h2v9h-2V9zm4 0h2v9h-2V9z" />
+                    </svg>
+                  </button>
+                ) : null}
               </div>
             </li>
           );

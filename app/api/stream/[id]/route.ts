@@ -11,15 +11,6 @@ export async function GET(_request: Request, context: RouteContext) {
   const { id } = await context.params;
   const supabase = await createServerSupabaseClient();
 
-  const {
-    data: { user },
-    error: authError
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { data: track, error: trackError } = await supabase
     .from("tracks")
     .select("id,storage_path")
