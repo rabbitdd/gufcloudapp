@@ -48,7 +48,7 @@ export function LibraryView({
   const [isAddTracksModalOpen, setIsAddTracksModalOpen] = useState(false);
   const [pendingDeleteChoiceTrack, setPendingDeleteChoiceTrack] =
     useState<Track | null>(null);
-  const [repeatMode, setRepeatMode] = useState<"off" | "all">("off");
+  const [repeatMode, setRepeatMode] = useState<"off" | "one">("off");
   const selectedAlbumId = searchParams.get("album");
 
   const loadTracks = useCallback(async () => {
@@ -268,18 +268,20 @@ export function LibraryView({
   };
 
   const handleTrackEnded = async (audio: HTMLAudioElement) => {
+    if (repeatMode === "one") {
+      audio.currentTime = 0;
+      await audio.play();
+      return;
+    }
+
     if (currentTrackIndex >= 0 && currentTrackIndex + 1 < activeQueue.length) {
       await handlePlay(activeQueue[currentTrackIndex + 1]);
       return;
     }
-
-    if (repeatMode === "all" && activeQueue.length > 0) {
-      await handlePlay(activeQueue[0]);
-    }
   };
 
   const handleToggleRepeat = () => {
-    setRepeatMode((prev) => (prev === "off" ? "all" : "off"));
+    setRepeatMode((prev) => (prev === "off" ? "one" : "off"));
   };
 
   const handleSignOut = async () => {
@@ -302,7 +304,7 @@ export function LibraryView({
   };
 
   return (
-    <main className="min-h-screen bg-black p-3 pb-32 lg:p-4 lg:pb-32">
+    <main className="min-h-screen bg-black px-3 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-3 lg:p-4 lg:pb-32">
       <div className="mx-auto w-full max-w-[1400px]">
         <div className="grid gap-3 lg:grid-cols-[76px_minmax(0,1fr)] xl:grid-cols-[76px_minmax(0,1fr)_320px]">
           <aside className="hidden h-[calc(100vh-150px)] flex-col rounded-2xl bg-zinc-950 p-3 lg:flex">
@@ -371,8 +373,8 @@ export function LibraryView({
             </div>
           </aside>
 
-          <section className="h-[calc(100vh-150px)] overflow-y-auto rounded-2xl bg-gradient-to-b from-zinc-900 to-black p-4 md:p-5">
-            <header className="mb-4 flex items-center justify-between">
+          <section className="min-h-[calc(100vh-190px)] overflow-y-auto rounded-2xl bg-gradient-to-b from-zinc-900 to-black p-4 md:p-5 lg:h-[calc(100vh-150px)] lg:min-h-0">
+            <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-wide text-zinc-400">
                   Your music
@@ -383,11 +385,11 @@ export function LibraryView({
                 </p>
               </div>
               {canManage ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-start sm:self-auto">
                   <button
                     type="button"
                     onClick={() => setIsUploadModalOpen(true)}
-                    className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-black hover:bg-zinc-300"
+                    className="rounded-full bg-zinc-100 px-3 py-2 text-xs font-semibold text-black hover:bg-zinc-300"
                   >
                     Upload song
                   </button>
@@ -404,12 +406,51 @@ export function LibraryView({
                 <button
                   type="button"
                   onClick={() => router.push("/login")}
-                  className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-900"
+                  className="self-start rounded-full border border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-200 hover:bg-zinc-900 sm:self-auto"
                 >
                   Sign in
                 </button>
               )}
             </header>
+
+            <div className="mb-4 lg:hidden">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {canManage ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsAlbumModalOpen(true)}
+                    className="shrink-0 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-200"
+                  >
+                    +
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => handleSelectAlbum(null)}
+                  className={`shrink-0 rounded-lg px-3 py-2 text-xs transition ${
+                    selectedAlbumId === null
+                      ? "bg-zinc-800 text-white"
+                      : "bg-zinc-900 text-zinc-300"
+                  }`}
+                >
+                  All tracks
+                </button>
+                {albums.map((album) => (
+                  <button
+                    type="button"
+                    key={`mobile-${album.id}`}
+                    onClick={() => handleSelectAlbum(album.id)}
+                    className={`shrink-0 rounded-lg px-3 py-2 text-xs transition ${
+                      selectedAlbumId === album.id
+                        ? "bg-zinc-800 text-white"
+                        : "bg-zinc-900 text-zinc-300"
+                    }`}
+                  >
+                    {album.name}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="mb-4 space-y-3">
               <input
@@ -419,7 +460,7 @@ export function LibraryView({
                 placeholder="What do you want to play?"
                 className="w-full rounded-full border border-zinc-800 bg-black px-4 py-2 text-sm text-zinc-100 outline-none ring-zinc-500 focus:ring-2"
               />
-              <div className="flex gap-2 text-xs">
+              <div className="flex gap-2 overflow-x-auto text-xs">
                 <span className="rounded-full bg-white px-3 py-1 text-black">All</span>
                 <span className="rounded-full bg-zinc-800 px-3 py-1 text-zinc-200">Music</span>
                 <span className="rounded-full bg-zinc-800 px-3 py-1 text-zinc-200">Uploaded</span>

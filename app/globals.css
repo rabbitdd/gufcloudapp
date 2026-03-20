@@ -7,4 +7,24 @@
 body {
   background: #000000;
   color: #d4d4d8;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 0;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 0;
 }

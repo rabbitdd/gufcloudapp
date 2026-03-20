@@ -101,7 +101,7 @@ export function CreateAlbumModal({
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-2xl rounded-2xl border border-zinc-800 bg-black p-4 shadow-2xl">
+      <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-zinc-800 bg-black p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-zinc-100">Create album</h2>
           <button
@@ -130,7 +130,7 @@ export function CreateAlbumModal({
             className="w-full text-sm text-zinc-300 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-100"
           />
 
-          <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-zinc-800 p-3">
+          <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-zinc-800 p-3">
             {sortedTracks.length ? (
               sortedTracks.map((track) => {
                 const checked = selectedTrackIds.includes(track.id);

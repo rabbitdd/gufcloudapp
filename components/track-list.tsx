@@ -70,7 +70,7 @@ export function TrackList({
             <li
               key={track.id}
               onClick={() => onPlay(track)}
-              className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 transition hover:bg-zinc-900/80"
+              className="flex min-h-16 cursor-pointer items-center justify-between gap-3 px-3 py-3 transition hover:bg-zinc-900/80 sm:px-4"
             >
               <div className="flex min-w-0 items-center gap-3">
                 <CoverPreview
@@ -87,7 +87,7 @@ export function TrackList({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={(event) => {
@@ -95,7 +95,7 @@ export function TrackList({
                     void onPlay(track);
                   }}
                   disabled={isLoading || isDeleting}
-                  className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-zinc-300 disabled:cursor-not-allowed disabled:bg-zinc-500"
+                  className="rounded-full bg-zinc-100 px-3 py-2 text-xs font-semibold text-black transition hover:bg-zinc-300 disabled:cursor-not-allowed disabled:bg-zinc-500"
                 >
                   {isLoading
                     ? "Loading..."
@@ -111,7 +111,7 @@ export function TrackList({
                       void onDelete?.(track);
                     }}
                     disabled={isDeleting || isLoading}
-                    className="rounded-full border border-zinc-700 p-2 text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-full border border-zinc-700 p-2.5 text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label={`Delete ${track.title}`}
                     title="Delete track"
                   >

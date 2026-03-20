@@ -10,7 +10,7 @@ type PlayerBarProps = {
   signedUrl: string | null;
   hasPrevious: boolean;
   hasNext: boolean;
-  repeatMode: "off" | "all";
+  repeatMode: "off" | "one";
   onToggleRepeat: () => void;
   onPrevious: () => Promise<void> | void;
   onNext: () => Promise<void> | void;
@@ -61,6 +61,14 @@ function PauseIcon() {
   );
 }
 
+function VolumeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+      <path d="M3 10v4h4l5 4V6L7 10H3zm12.5 2a4.5 4.5 0 00-2.5-4.03v8.06A4.5 4.5 0 0015.5 12zm0-8.5v2.06a8 8 0 010 12.88v2.06a10 10 0 000-16.99z" />
+    </svg>
+  );
+}
+
 export function PlayerBar({
   track,
   signedUrl,
@@ -76,7 +84,11 @@ export function PlayerBar({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const isRepeatActive = repeatMode !== "off";
+  const [volume, setVolume] = useState(80);
+  const [isMuted, setIsMuted] = useState(false);
+  const [lastVolume, setLastVolume] = useState(80);
+  const isReplayActive = repeatMode === "one";
+  const volumeDisplay = isMuted ? 0 : volume;
 
   useEffect(() => {
     if (!audioRef.current || !signedUrl) {
@@ -108,6 +120,16 @@ export function PlayerBar({
       cancelled = true;
     };
   }, [signedUrl]);
+
+  useEffect(() => {
+    if (!audioRef.current) {
+      return;
+    }
+
+    const audio = audioRef.current;
+    audio.volume = Math.max(0, Math.min(1, volume / 100));
+    audio.muted = isMuted;
+  }, [isMuted, volume]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -169,9 +191,30 @@ export function PlayerBar({
     setCurrentTime(nextTime);
   };
 
+  const handleVolumeChange = (nextVolume: number) => {
+    const clamped = Math.max(0, Math.min(100, nextVolume));
+    setVolume(clamped);
+    setIsMuted(clamped === 0);
+    if (clamped > 0) {
+      setLastVolume(clamped);
+    }
+  };
+
+  const toggleMute = () => {
+    if (isMuted || volume === 0) {
+      const restore = lastVolume > 0 ? lastVolume : 80;
+      setVolume(restore);
+      setIsMuted(false);
+      return;
+    }
+
+    setLastVolume(volume);
+    setIsMuted(true);
+  };
+
   return (
-    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-800 bg-black/95 p-3 backdrop-blur">
-      <div className="mx-auto grid w-full max-w-[1400px] gap-3 md:grid-cols-[1fr_1.4fr_1fr] md:items-center">
+    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-800 bg-black/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+      <div className="mx-auto grid w-full max-w-[1400px] gap-2 md:grid-cols-[1fr_1.4fr_1fr] md:items-center">
         <div className="flex items-center gap-3 md:min-w-0">
           {track?.cover_signed_url ? (
             <Image
@@ -199,18 +242,18 @@ export function PlayerBar({
 
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1 md:space-y-1">
           <div className="flex items-center justify-center gap-3">
             <button
               type="button"
               onClick={onToggleRepeat}
               className={`relative rounded-full p-2 transition ${
-                isRepeatActive
+                isReplayActive
                   ? "text-emerald-400 hover:text-emerald-300"
                   : "text-zinc-500 hover:text-zinc-300"
               }`}
-              aria-label={`Repeat mode: ${repeatMode}`}
-              title={`Repeat: ${repeatMode}`}
+              aria-label={`Replay mode: ${repeatMode}`}
+              title={`Replay: ${repeatMode}`}
             >
               <svg
                 viewBox="0 0 24 24"
@@ -219,7 +262,7 @@ export function PlayerBar({
               >
                 <path d="M17 1l4 4-4 4V6H7a3 3 0 00-3 3v1H2V9a5 5 0 015-5h10V1zM7 23l-4-4 4-4v3h10a3 3 0 003-3v-1h2v1a5 5 0 01-5 5H7v3z" />
               </svg>
-              {isRepeatActive ? (
+              {isReplayActive ? (
                 <span className="absolute bottom-0 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400" />
               ) : null}
             </button>
@@ -236,7 +279,7 @@ export function PlayerBar({
               type="button"
               onClick={() => void togglePlayPause()}
               disabled={!signedUrl}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-black transition hover:scale-105 hover:bg-white disabled:cursor-not-allowed disabled:bg-zinc-500 disabled:text-zinc-700"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-black transition hover:scale-105 hover:bg-white disabled:cursor-not-allowed disabled:bg-zinc-500 disabled:text-zinc-700"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? <PauseIcon /> : <PlayIcon />}
@@ -250,6 +293,31 @@ export function PlayerBar({
             >
               <NextIcon />
             </button>
+
+            <div className="ml-2 hidden items-center gap-2 md:flex">
+              <button
+                type="button"
+                onClick={toggleMute}
+                className="text-zinc-300 transition hover:text-white"
+                aria-label={isMuted ? "Unmute" : "Mute"}
+                title={isMuted ? "Unmute" : "Mute"}
+              >
+                <VolumeIcon />
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={volumeDisplay}
+                onChange={(event) => handleVolumeChange(Number(event.target.value))}
+                className="volume-slider h-1 w-20 cursor-pointer appearance-none rounded-lg"
+                style={{
+                  background: `linear-gradient(to right, #a1a1aa 0%, #a1a1aa ${volumeDisplay}%, #3f3f46 ${volumeDisplay}%, #3f3f46 100%)`
+                }}
+                aria-label="Volume"
+              />
+            </div>
           </div>
           <input
             type="range"
@@ -268,11 +336,7 @@ export function PlayerBar({
           </div>
         </div>
 
-        <div className="hidden justify-end md:flex">
-          <div className="rounded-full border border-zinc-800 px-3 py-1 text-xs text-zinc-300">
-            Queue: {hasNext ? "active" : "end"}
-          </div>
-        </div>
+        <div className="hidden md:block" />
 
         <audio ref={audioRef} className="hidden">
           {signedUrl ? <source src={signedUrl} /> : null}
