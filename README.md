@@ -1,144 +1,222 @@
-# GufCloud Music MVP
+# GufCloud — shared music library (MVP)
 
-Minimal web-native music library MVP built with:
-- Next.js (App Router) + TypeScript
-- Supabase Auth + Postgres + Storage
-- Tailwind CSS
+A minimal web music app: Next.js (App Router) + Supabase (Auth, Postgres, private Storage) with signed URLs for playback. Authenticated users share one library; guests can listen read-only.
 
-## What is implemented
+**Stack:** Next.js · TypeScript · Tailwind CSS · Supabase (Auth / Postgres / Storage)
 
-- Auth page (`/login`) with Supabase email/password sign-in and sign-up
-- Guest page (`/guest`) for listen-only access without auth
-- Protected library page (`/library`) for authenticated users only
-- Shared tracks library for all authenticated users
-- Albums: create album with name + cover and attach existing tracks
-- Add songs to selected album from a dedicated popup action on album view
-- Upload flow:
-  1. upload audio file to private `songs` bucket (`tracks/<uuid>-<safe-filename>`)
-  2. optional cover upload to private `songs` bucket (`covers/<uuid>-<safe-filename>`)
-  3. insert metadata into `tracks` table
-  4. refresh list
-- Track list with optional search (client-side)
-- Delete track button (trash icon) for uploaded tracks
-- Mobile-first dark UI inspired by modern music apps
-- Playback flow using signed URLs from server route:
-  - `GET /api/stream/:id`
+---
 
-## Project structure
+## Prerequisites
 
-- `app/login/page.tsx`
-- `app/library/page.tsx`
-- `app/guest/page.tsx`
-- `app/api/albums/route.ts`
-- `app/api/tracks/route.ts`
-- `app/api/tracks/[id]/route.ts`
-- `app/api/stream/[id]/route.ts`
-- `components/login-form.tsx`
-- `components/upload-song-form.tsx`
-- `components/create-album-modal.tsx`
-- `components/add-tracks-to-album-modal.tsx`
-- `components/track-list.tsx`
-- `components/player-bar.tsx`
-- `components/library-view.tsx`
-- `lib/supabase/client.ts`
-- `lib/supabase/server.ts`
-- `lib/supabase/middleware.ts`
-- `proxy.ts`
-- `types/track.ts`
-- `types/album.ts`
-- `supabase/migrations/001_init_tracks.sql`
-- `supabase/migrations/002_add_track_cover.sql`
-- `supabase/migrations/003_allow_track_delete.sql`
-- `supabase/migrations/004_guest_read_access.sql`
-- `supabase/migrations/005_albums.sql`
-- `supabase/migrations/006_album_track_delete_policy.sql`
+| Requirement | Notes |
+|-------------|--------|
+| **Node.js** | Current LTS (e.g. 20+) |
+| **npm** | Comes with Node |
+| **Docker Desktop** (or compatible engine) | Required **only** for **local** Supabase (`npm run infra:up`) |
+| **Supabase account** | Required **only** if you use a **hosted** project instead of local |
 
-## Local setup
+---
 
-1. Install dependencies:
+## Install
 
 ```bash
+git clone <your-repo-url>
+cd gufcloud
 npm install
 ```
 
-2. Create local env file:
+Copy environment template:
 
 ```bash
 cp .env.example .env.local
 ```
 
-3. Fill `.env.local` with Supabase project values:
+---
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+## Environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | **Yes** | Supabase API URL (hosted `https://…supabase.co` or local `http://127.0.0.1:54321`) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Yes** | Supabase **anon** (public) key |
+| `SUPABASE_SERVICE_ROLE_KEY` | No | Not used by this MVP |
+
+Fill `.env.local` using **one** of the flows below.
+
+---
+
+## Local development (recommended): Supabase CLI
+
+Migrations use `auth.users`, `storage.buckets`, and RLS — **plain Postgres alone is not enough**. This repo uses the **Supabase CLI**, which starts Postgres + Auth + Storage + Studio in Docker.
+
+### Start infrastructure
+
+```bash
+npm run infra:up
 ```
 
-4. Run development server:
+First run downloads Docker images (can take a few minutes).
+
+### Point the app at local Supabase
+
+```bash
+npm run env:local
+```
+
+You should see **both** `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the anon JWT used by the browser).
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<long JWT from env:local>
+```
+
+**If you only see `DB_URL` and a line like `Stopped services: [supabase_auth_… supabase_kong_…]`** — Auth/API containers are not running. The anon key is **not** available until they are. Fix:
+
+```bash
+npm run infra:down
+npm run infra:up
+```
+
+Wait until the command finishes without listing stopped services, then run `npm run env:local` again. You can also run `npm run infra:status` (pretty output) and copy **Project URL** + **anon** / **publishable** key from the **Authentication keys** section.
+
+### Apply database schema / migrations
+
+Migrations run automatically on a fresh DB when you reset:
+
+```bash
+npm run db:reset
+```
+
+This reapplies `supabase/migrations/*.sql` in order and runs `supabase/seed.sql` (empty by default — safe to extend).
+
+### Run the app
 
 ```bash
 npm run dev
 ```
 
-App runs at [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000).
 
-## Supabase setup
+**Useful URLs (local):**
 
-### 1) Apply SQL migration
+- **Studio (DB + Auth + Storage UI):** [http://127.0.0.1:54323](http://127.0.0.1:54323)
+- **Inbucket (test emails):** [http://127.0.0.1:54324](http://127.0.0.1:54324) (if enabled in CLI)
 
-Open Supabase SQL editor and run:
+### Stop infrastructure
 
-- `supabase/migrations/001_init_tracks.sql`
-- `supabase/migrations/002_add_track_cover.sql` (safe to run after 001)
-- `supabase/migrations/003_allow_track_delete.sql` (safe to run after 002)
-- `supabase/migrations/004_guest_read_access.sql` (safe to run after 003)
-- `supabase/migrations/005_albums.sql` (safe to run after 004)
-- `supabase/migrations/006_album_track_delete_policy.sql` (safe to run after 005)
+```bash
+npm run infra:down
+```
 
-This creates:
-- private storage bucket `songs`
-- `tracks` table
-- optional cover path in `tracks`
-- indexes
-- RLS
-- DB and storage policies
-- uploader-only delete policies for tracks and files
-- guest read policies for tracks and storage objects
-- album tables and policies (with album cover uploads)
-- delete policy for removing tracks from own albums
+### Reset local database only
 
-### 2) Confirm bucket privacy
+```bash
+npm run db:reset
+```
 
-In Supabase Dashboard -> Storage -> Buckets -> `songs`, make sure **Public bucket is OFF**.
+### Check status (ports, keys)
 
-### 3) Create users
+```bash
+npm run infra:status
+```
 
-Options:
-- use app UI at `/login` in **Sign up** mode
-- or create users in Supabase Dashboard -> Authentication -> Users
+### Makefile (optional)
 
-If email confirmation is enabled, users must confirm email before first sign-in.
+```bash
+make install
+make infra-up
+make db-reset
+make dev
+make stop
+```
 
-## How to test upload and playback
+---
 
-1. Sign up (or sign in) at `/login`.
-2. Open `/library`.
-3. Upload an audio file (`.mp3`, `.m4a`, etc), optionally include a cover image.
-4. Confirm it appears in the list.
-5. Click **Play** on a track.
-6. Verify audio starts and current player bar updates.
-7. Click trash icon on your uploaded track and confirm deletion.
-8. Sign out and log in with second user:
-   - verify the same shared library is visible
-   - verify playback works for previously uploaded tracks
-9. Open `/guest` and verify you can listen but cannot upload/delete.
-10. Create an album from the left sidebar (+), pick tracks, and verify filtering works.
-11. Select an album and click **Add songs to album** to attach tracks from popup.
-12. In selected album view, delete a track and choose between album-only removal or full delete.
+## Alternative: hosted Supabase (no local Docker)
 
-## Notes
+1. Create a project at [supabase.com](https://supabase.com).
+2. **Project Settings → API:** copy **Project URL** and **anon public** key into `.env.local`.
+3. **Run migrations** in the SQL Editor, **in order** (same files as local):
 
-- Storage is private; playback uses signed URLs only.
-- Guest mode is read/listen only (no upload/delete actions).
-- No playlists, likes, favorites, recommendations, or admin panel in this MVP.
-- No service role key is required for current implementation.
+   - `supabase/migrations/001_init_tracks.sql`
+   - `supabase/migrations/002_add_track_cover.sql`
+   - `supabase/migrations/003_allow_track_delete.sql`
+   - `supabase/migrations/004_guest_read_access.sql`
+   - `supabase/migrations/005_albums.sql`
+   - `supabase/migrations/006_album_track_delete_policy.sql`
+
+4. Confirm **Storage → Buckets:** `songs` exists and is **private** (not public).
+
+No `npm run infra:*` needed for this path.
+
+---
+
+## Seed / test data
+
+- **Local:** edit `supabase/seed.sql`, then `npm run db:reset`.
+- **Hosted:** run SQL manually in the Dashboard if you add seed statements.
+
+There is no default seed data — sign up via `/login` or create users in the Dashboard.
+
+---
+
+## What you must still do manually (Supabase)
+
+Whether **local** or **hosted**:
+
+- **Users:** sign up in the app (`/login`) or create users under **Authentication → Users**.
+- **Email confirmation:** if enabled on the project, users must confirm before first sign-in. Local CLI often has confirmations off — check **Authentication → Providers → Email**.
+- **Storage:** migrations create the `songs` bucket and policies; verify the bucket stays **private** for production-like behavior.
+
+---
+
+## Scripts reference
+
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Next.js dev server |
+| `npm run build` / `npm start` | Production build / run |
+| `npm run lint` | ESLint |
+| `npm run infra:up` | Start local Supabase (Docker) |
+| `npm run infra:down` | Stop local Supabase |
+| `npm run infra:status` | Show local URLs and status |
+| `npm run env:local` | Print env-style output (URL + keys) for `.env.local` |
+| `npm run env:local:pretty` | Human-readable `supabase status` (URLs + keys) |
+| `npm run db:reset` | Drop local DB data, re-run migrations + seed |
+
+---
+
+## Troubleshooting
+
+| Issue | What to try |
+|-------|-------------|
+| `env:local` prints only `DB_URL` / no anon key | **Auth/Kong/etc. are stopped** (see `Stopped services:`). Run `npm run infra:down` then `npm run infra:up`, then `npm run env:local` again. Use `npm run env:local:pretty` to see keys when healthy. |
+| `Missing NEXT_PUBLIC_SUPABASE_URL…` | Ensure `.env.local` exists and both vars are set; restart `npm run dev`. |
+| `infra:up` fails | Start Docker Desktop; wait for it to be ready; retry. |
+| Port already in use | `npm run infra:status` — stop other Supabase stacks or change ports in `supabase/config.toml` (then `infra:down` / `infra:up`). |
+| Migrations error on hosted | Run files **in order**; do not skip `001`. |
+| Images / covers broken locally | Use `http://127.0.0.1:54321` in `.env.local`; `next.config.ts` allows local storage URLs. |
+| Build without `.env.local` | `npm run build` can succeed with dummy values; **runtime** still needs real URL + anon key. |
+
+---
+
+## Project layout (high level)
+
+- `app/` — routes, API handlers (`/api/tracks`, `/api/stream`, `/api/albums`, …)
+- `components/` — UI (library, player, modals, login)
+- `lib/supabase/` — browser/server clients, middleware env
+- `supabase/migrations/` — SQL schema and policies (source of truth)
+- `supabase/seed.sql` — optional local seed
+- `supabase/config.toml` — local Supabase CLI settings
+- `docker-compose.yml` — **not** the app stack; local DB is via **Supabase CLI** (see file comment)
+- `proxy.ts` — Next.js proxy for Supabase session cookies
+
+---
+
+## Feature snapshot
+
+- Email/password sign-in and sign-up; guest listen-only mode (`/guest`)
+- Shared track library, uploads with optional cover, albums, signed URL playback
+- Mobile-friendly dark UI
+
+See earlier sections for Supabase policies and tables created by migrations.

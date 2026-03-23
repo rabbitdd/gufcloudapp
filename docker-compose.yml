@@ -1,0 +1,13 @@
+# GufCloud uses the Supabase CLI for local infrastructure (`supabase start`).
+# That starts Postgres, Auth, Storage, and related services in Docker.
+#
+# Do not use this file for the app database — use:
+#   npm run infra:up
+#
+# The placeholder below exists only so `docker compose config` stays valid;
+# it never runs unless you explicitly enable profile `disabled`.
+
+services:
+  _local_stack_is_supabase_cli:
+    image: alpine:3.20
+    profiles: ["disabled"]

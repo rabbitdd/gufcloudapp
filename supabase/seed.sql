@@ -1,0 +1,3 @@
+-- Optional seed data for local development.
+-- Runs after migrations when you execute: npm run db:reset
+-- Add INSERT statements here if you want repeatable demo rows.

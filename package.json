@@ -7,7 +7,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "infra:up": "supabase start",
+    "infra:down": "supabase stop",
+    "infra:status": "supabase status",
+    "env:local": "supabase status -o env --override-name api.url=NEXT_PUBLIC_SUPABASE_URL --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "env:local:pretty": "supabase status",
+    "db:reset": "supabase db reset"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +33,7 @@
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.1.7",
     "postcss": "^8.5.8",
+    "supabase": "^2.83.0",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3"
   }
