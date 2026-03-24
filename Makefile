@@ -1,4 +1,4 @@
-.PHONY: install infra-up infra-down infra-status db-reset dev stop help
+.PHONY: install infra-up infra-down infra-status db-reset dev worker stop help
 
 help:
 	@echo "Targets:"
@@ -8,6 +8,7 @@ help:
 	@echo "  make infra-status - Show URLs and keys"
 	@echo "  make db-reset     - Reset DB and re-apply migrations + seed"
 	@echo "  make dev          - next dev"
+	@echo "  make worker       - ingestion worker"
 	@echo "  make stop         - same as infra-down"
 
 install:
@@ -27,5 +28,8 @@ db-reset:
 
 dev:
 	npm run dev
+
+worker:
+	npm run worker:ingestion
 
 stop: infra-down

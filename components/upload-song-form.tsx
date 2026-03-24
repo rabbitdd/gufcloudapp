@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createImageThumbnailFile } from "@/lib/client/image-thumbnail";
 import { DEFAULT_ARTIST } from "@/lib/constants";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
@@ -25,6 +26,7 @@ export function UploadSongForm({ onUploaded }: UploadSongFormProps) {
   const supabase = createBrowserSupabaseClient();
   const [file, setFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverThumbFile, setCoverThumbFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -61,6 +63,7 @@ export function UploadSongForm({ onUploaded }: UploadSongFormProps) {
     const safeFilename = sanitizeFilename(file.name);
     const storagePath = `tracks/${crypto.randomUUID()}-${safeFilename}`;
     let coverStoragePath: string | null = null;
+    let coverThumbStoragePath: string | null = null;
 
     const { error: uploadError } = await supabase.storage
       .from(SONGS_BUCKET)
@@ -91,6 +94,24 @@ export function UploadSongForm({ onUploaded }: UploadSongFormProps) {
         setUploading(false);
         return;
       }
+
+      if (coverThumbFile) {
+        const safeThumbFilename = sanitizeFilename(coverThumbFile.name);
+        coverThumbStoragePath = `cover-thumbs/${crypto.randomUUID()}-${safeThumbFilename}`;
+
+        const { error: thumbUploadError } = await supabase.storage
+          .from(SONGS_BUCKET)
+          .upload(coverThumbStoragePath, coverThumbFile, {
+            cacheControl: "31536000",
+            upsert: false
+          });
+
+        if (thumbUploadError) {
+          setError(thumbUploadError.message);
+          setUploading(false);
+          return;
+        }
+      }
     }
 
     const trackTitle = title.trim() || inferTitle(file.name);
@@ -101,6 +122,7 @@ export function UploadSongForm({ onUploaded }: UploadSongFormProps) {
       artist: artistValue,
       storage_path: storagePath,
       cover_storage_path: coverStoragePath,
+      cover_thumb_storage_path: coverThumbStoragePath,
       uploaded_by: user.id
     });
 
@@ -112,6 +134,7 @@ export function UploadSongForm({ onUploaded }: UploadSongFormProps) {
 
     setFile(null);
     setCoverFile(null);
+    setCoverThumbFile(null);
     setTitle("");
     setArtist("");
     setUploading(false);
@@ -136,7 +159,16 @@ export function UploadSongForm({ onUploaded }: UploadSongFormProps) {
       <input
         type="file"
         accept="image/*"
-        onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)}
+        onChange={async (event) => {
+          const nextCoverFile = event.target.files?.[0] ?? null;
+          setCoverFile(nextCoverFile);
+          if (!nextCoverFile) {
+            setCoverThumbFile(null);
+            return;
+          }
+          const thumb = await createImageThumbnailFile(nextCoverFile);
+          setCoverThumbFile(thumb);
+        }}
         className="w-full text-sm text-zinc-300 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-100"
       />
 

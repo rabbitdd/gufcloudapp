@@ -1,69 +1,29 @@
 import { redirect } from "next/navigation";
 import { LibraryView } from "@/components/library-view";
+import { canManageContent, getAuthContext } from "@/lib/modules/authz";
+import { listAlbumsForLibrary, listTracksForLibrary } from "@/lib/modules/catalog";
+import { createServerAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export default async function LibraryPage() {
-
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const readerClient = await createServerSupabaseClient();
+  const signerClient = createServerAdminSupabaseClient() ?? readerClient;
+  const auth = await getAuthContext(readerClient);
+  if (!auth) {
     redirect("/login");
   }
 
-  const { data: tracks } = await supabase
-    .from("tracks")
-    .select(
-      "id,title,artist,album,duration_sec,storage_path,cover_storage_path,uploaded_by,created_at"
-    )
-    .order("created_at", { ascending: false });
-
-  const tracksWithCoverUrl = await Promise.all(
-    (tracks ?? []).map(async (track) => {
-      if (!track.cover_storage_path) {
-        return { ...track, cover_signed_url: null };
-      }
-
-      const { data } = await supabase.storage
-        .from("songs")
-        .createSignedUrl(track.cover_storage_path, 60 * 60);
-
-      return { ...track, cover_signed_url: data?.signedUrl ?? null };
-    })
-  );
-
-  const { data: albums } = await supabase
-    .from("albums")
-    .select("id,name,cover_storage_path,owner_id,created_at,album_tracks(track_id)")
-    .order("created_at", { ascending: false });
-
-  const albumsWithCoverUrl = await Promise.all(
-    (albums ?? []).map(async (album) => {
-      const trackIds = (album.album_tracks ?? []).map((row) => row.track_id);
-      if (!album.cover_storage_path) {
-        return { ...album, cover_signed_url: null, track_ids: trackIds };
-      }
-
-      const { data } = await supabase.storage
-        .from("songs")
-        .createSignedUrl(album.cover_storage_path, 60 * 60);
-
-      return {
-        ...album,
-        cover_signed_url: data?.signedUrl ?? null,
-        track_ids: trackIds
-      };
-    })
-  );
+  const [tracksWithCoverUrl, albumsWithCoverUrl] = await Promise.all([
+    listTracksForLibrary(readerClient, signerClient),
+    listAlbumsForLibrary(readerClient, signerClient)
+  ]);
 
   return (
     <LibraryView
-      userEmail={user.email ?? "Signed in user"}
+      userEmail={auth.email ?? "Signed in user"}
       initialTracks={tracksWithCoverUrl}
       initialAlbums={albumsWithCoverUrl}
-      canManage
+      canManage={canManageContent(auth.role)}
     />
   );
 }

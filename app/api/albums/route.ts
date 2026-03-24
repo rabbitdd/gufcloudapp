@@ -1,65 +1,41 @@
 import { NextResponse } from "next/server";
+import { canManageContent, getAuthContext } from "@/lib/modules/authz";
+import { listAlbumsForLibrary } from "@/lib/modules/catalog";
+import { createServerAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type CreateAlbumPayload = {
   name: string;
   coverStoragePath?: string | null;
+  coverThumbStoragePath?: string | null;
   trackIds?: string[];
 };
 
 export async function GET() {
-  const supabase = await createServerSupabaseClient();
-
-  const { data, error } = await supabase
-    .from("albums")
-    .select(
-      "id,name,cover_storage_path,owner_id,created_at,album_tracks(track_id)"
-    )
-    .order("created_at", { ascending: false });
-
-  if (error) {
+  try {
+    const readerClient = await createServerSupabaseClient();
+    const signerClient = createServerAdminSupabaseClient() ?? readerClient;
+    const albums = await listAlbumsForLibrary(readerClient, signerClient);
+    return NextResponse.json({ albums });
+  } catch {
     return NextResponse.json(
       { error: "Failed to load albums." },
       { status: 500 }
     );
   }
-
-  const albums = await Promise.all(
-    (data ?? []).map(async (album) => {
-      const trackIds = (album.album_tracks ?? []).map((row) => row.track_id);
-
-      if (!album.cover_storage_path) {
-        return {
-          ...album,
-          cover_signed_url: null,
-          track_ids: trackIds
-        };
-      }
-
-      const { data: signedData } = await supabase.storage
-        .from("songs")
-        .createSignedUrl(album.cover_storage_path, 60 * 60);
-
-      return {
-        ...album,
-        cover_signed_url: signedData?.signedUrl ?? null,
-        track_ids: trackIds
-      };
-    })
-  );
-
-  return NextResponse.json({ albums });
 }
 
 export async function POST(request: Request) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error: authError
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
+  const auth = await getAuthContext(supabase);
+  if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!canManageContent(auth.role)) {
+    return NextResponse.json(
+      { error: "Only uploaders/admins can create albums." },
+      { status: 403 }
+    );
   }
 
   const payload = (await request.json()) as CreateAlbumPayload;
@@ -77,9 +53,10 @@ export async function POST(request: Request) {
     .insert({
       name,
       cover_storage_path: payload.coverStoragePath ?? null,
-      owner_id: user.id
+      cover_thumb_storage_path: payload.coverThumbStoragePath ?? null,
+      owner_id: auth.userId
     })
-    .select("id,name,cover_storage_path,owner_id,created_at")
+    .select("id,name,cover_storage_path,cover_thumb_storage_path,owner_id,created_at")
     .single();
 
   if (insertAlbumError || !album) {

@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AddTracksToAlbumModal } from "@/components/add-tracks-to-album-modal";
 import { CreateAlbumModal } from "@/components/create-album-modal";
+import { EditAlbumModal } from "@/components/edit-album-modal";
 import { UploadSongForm } from "@/components/upload-song-form";
 import { TrackList } from "@/components/track-list";
 import { PlayerBar } from "@/components/player-bar";
@@ -14,6 +15,11 @@ import { Album } from "@/types/album";
 import { Track } from "@/types/track";
 
 type DeleteChoiceMode = "album" | "all";
+const PLAYBACK_URL_FALLBACK_TTL_MS = 55 * 60 * 1000;
+
+function currentTimestampMs() {
+  return Date.now();
+}
 
 type LibraryViewProps = {
   userEmail: string;
@@ -45,10 +51,14 @@ export function LibraryView({
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
+  const [isEditAlbumModalOpen, setIsEditAlbumModalOpen] = useState(false);
   const [isAddTracksModalOpen, setIsAddTracksModalOpen] = useState(false);
   const [pendingDeleteChoiceTrack, setPendingDeleteChoiceTrack] =
     useState<Track | null>(null);
   const [repeatMode, setRepeatMode] = useState<"off" | "one">("off");
+  const playbackUrlCacheRef = useRef<
+    Map<string, { signedUrl: string; expiresAtMs: number }>
+  >(new Map());
   const selectedAlbumId = searchParams.get("album");
 
   const loadTracks = useCallback(async () => {
@@ -92,6 +102,10 @@ export function LibraryView({
     }
     return albums.find((album) => album.id === selectedAlbumId)?.track_ids ?? [];
   }, [albums, selectedAlbumId]);
+  const selectedAlbum = useMemo(
+    () => albums.find((album) => album.id === selectedAlbumId) ?? null,
+    [albums, selectedAlbumId]
+  );
 
   const filteredTracks = useMemo(() => {
     const selectedTrackSet = selectedAlbumId
@@ -111,7 +125,29 @@ export function LibraryView({
     });
   }, [search, selectedAlbumId, selectedAlbumTrackIds, tracks]);
 
-  const fetchSignedUrl = async (trackId: string) => {
+  const getCachedPlaybackUrl = (trackId: string) => {
+    const cached = playbackUrlCacheRef.current.get(trackId);
+    if (!cached) {
+      return null;
+    }
+    if (currentTimestampMs() >= cached.expiresAtMs - 20_000) {
+      playbackUrlCacheRef.current.delete(trackId);
+      return null;
+    }
+    return cached.signedUrl;
+  };
+
+  const fetchSignedUrl = async (
+    trackId: string,
+    options: { useCache?: boolean } = {}
+  ) => {
+    if (options.useCache !== false) {
+      const cached = getCachedPlaybackUrl(trackId);
+      if (cached) {
+        return cached;
+      }
+    }
+
     const response = await fetch(`/api/stream/${trackId}`, {
       method: "GET"
     });
@@ -120,7 +156,21 @@ export function LibraryView({
       return null;
     }
 
-    const payload = (await response.json()) as { signedUrl: string };
+    const payload = (await response.json()) as {
+      signedUrl: string;
+      expiresAt?: string;
+    };
+    if (payload.signedUrl) {
+      const expiresAtMs = payload.expiresAt
+        ? Date.parse(payload.expiresAt)
+        : currentTimestampMs() + PLAYBACK_URL_FALLBACK_TTL_MS;
+      playbackUrlCacheRef.current.set(trackId, {
+        signedUrl: payload.signedUrl,
+        expiresAtMs: Number.isNaN(expiresAtMs)
+          ? currentTimestampMs() + PLAYBACK_URL_FALLBACK_TTL_MS
+          : expiresAtMs
+      });
+    }
     return payload.signedUrl;
   };
 
@@ -137,6 +187,13 @@ export function LibraryView({
 
     setCurrentTrack(track);
     setSignedUrl(nextSignedUrl);
+
+    const nextIndex = activeQueue.findIndex((item) => item.id === track.id) + 1;
+    if (nextIndex > 0 && nextIndex < activeQueue.length) {
+      const upcomingTrack = activeQueue[nextIndex];
+      void fetchSignedUrl(upcomingTrack.id, { useCache: true });
+    }
+
     setLoadingTrackId(null);
   };
 
@@ -484,13 +541,20 @@ export function LibraryView({
             )}
 
             {canManage && selectedAlbumId ? (
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAddTracksModalOpen(true)}
                   className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-900"
                 >
                   Add songs to album
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditAlbumModalOpen(true)}
+                  className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-900"
+                >
+                  Edit album
                 </button>
               </div>
             ) : null}
@@ -616,6 +680,16 @@ export function LibraryView({
                     : album
                 )
               );
+            }}
+          />
+        ) : null}
+
+        {canManage && selectedAlbum && isEditAlbumModalOpen ? (
+          <EditAlbumModal
+            album={selectedAlbum}
+            onClose={() => setIsEditAlbumModalOpen(false)}
+            onUpdated={async () => {
+              await loadAlbums();
             }}
           />
         ) : null}
