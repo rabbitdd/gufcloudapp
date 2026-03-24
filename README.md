@@ -39,7 +39,10 @@ cp .env.example .env.local
 |----------|----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | **Yes** | Supabase API URL (hosted `https://…supabase.co` or local `http://127.0.0.1:54321`) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Yes** | Supabase **anon** (public) key |
-| `SUPABASE_SERVICE_ROLE_KEY` | No | Not used by this MVP |
+| `SUPABASE_SERVICE_ROLE_KEY` | Recommended | Used by server-side signed URL hardening and required by ingestion worker |
+| `WORKER_POLL_INTERVAL_MS` | No | Poll interval for ingestion worker (default `3000`) |
+| `CRON_SECRET` | Recommended on Vercel | Auth for `/api/worker/ingestion-tick` cron endpoint |
+| `INGESTION_TICK_BATCH_SIZE` | No | Jobs processed per Vercel cron tick (default `5`) |
 
 Fill `.env.local` using **one** of the flows below.
 
@@ -64,6 +67,12 @@ npm run env:local
 ```
 
 You should see **both** `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the anon JWT used by the browser).
+
+If you also want worker/server hardening keys, run:
+
+```bash
+npm run env:local:all
+```
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
@@ -96,6 +105,27 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+### Run ingestion worker (recommended for metadata pipeline)
+
+```bash
+npm run worker:ingestion
+```
+
+This worker consumes `processing_jobs` and marks new tracks as `ready` after ingestion tasks complete.
+
+### Vercel-only mode (no persistent worker process)
+
+If you deploy only on Vercel, ingestion can run via cron ticks:
+
+1. Keep `vercel.json` in repo (already added) with:
+   - `path: /api/worker/ingestion-tick`
+   - `schedule: * * * * *`
+2. Set Vercel env vars:
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `CRON_SECRET` (strong random string)
+   - optional `INGESTION_TICK_BATCH_SIZE` (default `5`)
+3. Vercel cron calls the endpoint every minute and processes pending jobs in small batches.
 
 **Useful URLs (local):**
 
@@ -144,6 +174,10 @@ make stop
    - `supabase/migrations/004_guest_read_access.sql`
    - `supabase/migrations/005_albums.sql`
    - `supabase/migrations/006_album_track_delete_policy.sql`
+   - `supabase/migrations/007_roles_assets_jobs.sql`
+   - `supabase/migrations/008_harden_storage_read_policy.sql`
+   - `supabase/migrations/009_cover_thumbnail_paths.sql`
+   - `supabase/migrations/010_album_update_policy.sql`
 
 4. Confirm **Storage → Buckets:** `songs` exists and is **private** (not public).
 
@@ -181,8 +215,11 @@ Whether **local** or **hosted**:
 | `npm run infra:down` | Stop local Supabase |
 | `npm run infra:status` | Show local URLs and status |
 | `npm run env:local` | Print env-style output (URL + keys) for `.env.local` |
+| `npm run env:local:all` | Print URL + anon + service-role keys in env format |
 | `npm run env:local:pretty` | Human-readable `supabase status` (URLs + keys) |
 | `npm run db:reset` | Drop local DB data, re-run migrations + seed |
+| `npm run worker:ingestion` | Run ingestion worker loop |
+| `npm run worker:ingestion:once` | Run one worker iteration (debugging) |
 
 ---
 
@@ -197,6 +234,7 @@ Whether **local** or **hosted**:
 | Migrations error on hosted | Run files **in order**; do not skip `001`. |
 | Images / covers broken locally | Use `http://127.0.0.1:54321` in `.env.local`; `next.config.ts` allows local storage URLs. |
 | Build without `.env.local` | `npm run build` can succeed with dummy values; **runtime** still needs real URL + anon key. |
+| Tracks stay `pending` on Vercel | Ensure `vercel.json` cron is deployed, and set `CRON_SECRET` + `SUPABASE_SERVICE_ROLE_KEY` in Vercel env. |
 
 ---
 
@@ -204,10 +242,12 @@ Whether **local** or **hosted**:
 
 - `app/` — routes, API handlers (`/api/tracks`, `/api/stream`, `/api/albums`, …)
 - `components/` — UI (library, player, modals, login)
+- `lib/modules/` — app domain modules (`authz`, `catalog`, `playback`)
 - `lib/supabase/` — browser/server clients, middleware env
 - `supabase/migrations/` — SQL schema and policies (source of truth)
 - `supabase/seed.sql` — optional local seed
 - `supabase/config.toml` — local Supabase CLI settings
+- `scripts/ingestion-worker.mjs` — minimal async ingestion worker
 - `docker-compose.yml` — **not** the app stack; local DB is via **Supabase CLI** (see file comment)
 - `proxy.ts` — Next.js proxy for Supabase session cookies
 
@@ -217,6 +257,8 @@ Whether **local** or **hosted**:
 
 - Email/password sign-in and sign-up; guest listen-only mode (`/guest`)
 - Shared track library, uploads with optional cover, albums, signed URL playback
+- Role-aware write operations (`viewer` / `uploader` / `admin`) via `profiles`
+- Ingestion primitives: `track_assets`, `processing_jobs`, and worker loop
 - Mobile-friendly dark UI
 
 See earlier sections for Supabase policies and tables created by migrations.

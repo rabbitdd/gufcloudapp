@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { canManageContent, getAuthContext } from "@/lib/modules/authz";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type RouteContext = {
@@ -11,13 +12,17 @@ type TrackPayload = {
 
 async function requireOwnedAlbum(id: string) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error: authError
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
+  const auth = await getAuthContext(supabase);
+  if (!auth) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  if (!canManageContent(auth.role)) {
+    return {
+      error: NextResponse.json(
+        { error: "Only uploaders/admins can manage album tracks." },
+        { status: 403 }
+      )
+    };
   }
 
   const { data: album, error: albumError } = await supabase
@@ -30,7 +35,7 @@ async function requireOwnedAlbum(id: string) {
     return { error: NextResponse.json({ error: "Album not found" }, { status: 404 }) };
   }
 
-  if (album.owner_id !== user.id) {
+  if (album.owner_id !== auth.userId) {
     return {
       error: NextResponse.json(
         { error: "You can only modify your own albums." },

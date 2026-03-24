@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { canManageContent, getAuthContext } from "@/lib/modules/authz";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type RouteContext = {
@@ -8,14 +9,15 @@ type RouteContext = {
 export async function DELETE(_request: Request, context: RouteContext) {
   const { id } = await context.params;
   const supabase = await createServerSupabaseClient();
-
-  const {
-    data: { user },
-    error: authError
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
+  const auth = await getAuthContext(supabase);
+  if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!canManageContent(auth.role)) {
+    return NextResponse.json(
+      { error: "Only uploaders/admins can delete tracks." },
+      { status: 403 }
+    );
   }
 
   const { data: track, error: trackError } = await supabase
@@ -28,7 +30,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
 
-  if (track.uploaded_by !== user.id) {
+  if (track.uploaded_by !== auth.userId) {
     return NextResponse.json(
       { error: "You can only delete tracks you uploaded." },
       { status: 403 }
@@ -56,7 +58,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     .from("tracks")
     .delete()
     .eq("id", id)
-    .eq("uploaded_by", user.id);
+    .eq("uploaded_by", auth.userId);
 
   if (deleteError) {
     return NextResponse.json(

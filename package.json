@@ -12,8 +12,11 @@
     "infra:down": "supabase stop",
     "infra:status": "supabase status",
     "env:local": "supabase status -o env --override-name api.url=NEXT_PUBLIC_SUPABASE_URL --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "env:local:all": "supabase status -o env --override-name api.url=NEXT_PUBLIC_SUPABASE_URL --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY",
     "env:local:pretty": "supabase status",
-    "db:reset": "supabase db reset"
+    "db:reset": "supabase db reset",
+    "worker:ingestion": "node scripts/ingestion-worker.mjs",
+    "worker:ingestion:once": "WORKER_ONCE=1 node scripts/ingestion-worker.mjs"
   },
   "keywords": [],
   "author": "",
