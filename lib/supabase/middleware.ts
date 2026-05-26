@@ -22,7 +22,12 @@ export async function updateSession(request: NextRequest) {
     }
   });
 
-  await supabase.auth.getUser();
+  try {
+    await supabase.auth.getUser();
+  } catch {
+    // Ignore stale/invalid refresh-token errors in middleware.
+    // The app pages handle unauthenticated users via redirects.
+  }
 
   return response;
 }

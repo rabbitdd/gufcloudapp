@@ -213,20 +213,20 @@ export function PlayerBar({
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-800 bg-black/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur">
-      <div className="mx-auto grid w-full max-w-[1400px] gap-2 md:grid-cols-[1fr_1.4fr_1fr] md:items-center">
+    <div className="fixed inset-x-0 bottom-0 z-20 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 sm:px-0 sm:pb-0 sm:pt-0">
+      <div className="mx-auto grid w-full max-w-[1400px] gap-2 rounded-2xl border border-zinc-800 bg-black/95 px-3 py-2.5 shadow-[0_-10px_30px_rgba(0,0,0,0.45)] backdrop-blur md:grid-cols-[1fr_1.4fr_1fr] md:items-center sm:rounded-none sm:border-t sm:border-x-0 sm:border-b-0 sm:px-3 sm:py-3.5 sm:shadow-none">
         <div className="flex items-center gap-3 md:min-w-0">
           {track?.cover_signed_url ? (
             <Image
               src={track.cover_signed_url}
               alt={`${track.title} cover`}
-              width={44}
-              height={44}
-              className="h-11 w-11 rounded-md object-cover"
+              width={48}
+              height={48}
+              className="h-12 w-12 rounded-md object-cover"
               unoptimized
             />
           ) : (
-            <div className="flex h-11 w-11 items-center justify-center rounded-md bg-zinc-800 text-zinc-300">
+            <div className="flex h-12 w-12 items-center justify-center rounded-md bg-zinc-800 text-zinc-300">
               ♪
             </div>
           )}
@@ -239,10 +239,58 @@ export function PlayerBar({
               {track?.artist || DEFAULT_ARTIST}
             </p>
           </div>
+          <div className="ml-auto flex items-center gap-1 md:hidden">
+            <button
+              type="button"
+              onClick={onToggleRepeat}
+              className={`relative rounded-full p-2.5 transition ${
+                isReplayActive
+                  ? "text-emerald-400 hover:text-emerald-300"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+              aria-label={`Replay mode: ${repeatMode}`}
+              title={`Replay: ${repeatMode}`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4 fill-current"
+                aria-hidden="true"
+              >
+                <path d="M17 1l4 4-4 4V6H7a3 3 0 00-3 3v1H2V9a5 5 0 015-5h10V1zM7 23l-4-4 4-4v3h10a3 3 0 003-3v-1h2v1a5 5 0 01-5 5H7v3z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => void onPrevious()}
+              disabled={!hasPrevious}
+              className="rounded-full p-2.5 text-zinc-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Previous track"
+            >
+              <PreviousIcon />
+            </button>
+            <button
+              type="button"
+              onClick={() => void togglePlayPause()}
+              disabled={!signedUrl}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-100 text-black transition hover:scale-105 hover:bg-white disabled:cursor-not-allowed disabled:bg-zinc-500 disabled:text-zinc-700"
+              aria-label={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? <PauseIcon /> : <PlayIcon />}
+            </button>
+            <button
+              type="button"
+              onClick={() => void onNext()}
+              disabled={!hasNext}
+              className="rounded-full p-2.5 text-zinc-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Next track"
+            >
+              <NextIcon />
+            </button>
+          </div>
 
         </div>
 
-        <div className="space-y-1 md:space-y-1">
+        <div className="hidden space-y-1 md:block md:space-y-1">
           <div className="flex items-center justify-center gap-3">
             <button
               type="button"
