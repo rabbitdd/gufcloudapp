@@ -23,7 +23,7 @@ function formatDate(value: string) {
 function CoverPreview({ coverUrl, title }: { coverUrl: string | null | undefined; title: string }) {
   if (!coverUrl) {
     return (
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-zinc-800 text-xs font-semibold text-zinc-300">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-xs font-semibold text-zinc-300 sm:rounded-md">
         ♪
       </div>
     );
@@ -35,7 +35,7 @@ function CoverPreview({ coverUrl, title }: { coverUrl: string | null | undefined
       alt={`${title} cover`}
       width={48}
       height={48}
-      className="h-12 w-12 shrink-0 rounded-md object-cover"
+      className="h-12 w-12 shrink-0 rounded-lg object-cover sm:rounded-md"
       unoptimized
     />
   );
@@ -70,7 +70,7 @@ export function TrackList({
             <li
               key={track.id}
               onClick={() => onPlay(track)}
-              className="flex min-h-16 cursor-pointer items-center justify-between gap-3 px-3 py-3 transition hover:bg-zinc-900/80 sm:px-4"
+              className="flex min-h-[72px] cursor-pointer items-center justify-between gap-3 px-3 py-3 transition hover:bg-zinc-900/80 sm:min-h-16 sm:px-4"
             >
               <div className="flex min-w-0 items-center gap-3">
                 <CoverPreview
@@ -78,10 +78,10 @@ export function TrackList({
                   title={track.title}
                 />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-white">
+                  <p className="truncate text-[15px] font-medium text-white sm:text-sm">
                     {track.title}
                   </p>
-                  <p className="truncate text-xs text-zinc-400">
+                  <p className="truncate text-[12px] text-zinc-400 sm:text-xs">
                     {track.artist || DEFAULT_ARTIST} - {formatDate(track.created_at)}
                   </p>
                 </div>
@@ -95,7 +95,7 @@ export function TrackList({
                     void onPlay(track);
                   }}
                   disabled={isLoading || isDeleting}
-                  className="rounded-full bg-zinc-100 px-3 py-2 text-xs font-semibold text-black transition hover:bg-zinc-300 disabled:cursor-not-allowed disabled:bg-zinc-500"
+                  className="rounded-full bg-zinc-100 px-3 py-2.5 text-xs font-semibold text-black transition hover:bg-zinc-300 disabled:cursor-not-allowed disabled:bg-zinc-500 sm:py-2"
                 >
                   {isLoading
                     ? "Loading..."
@@ -111,7 +111,7 @@ export function TrackList({
                       void onDelete?.(track);
                     }}
                     disabled={isDeleting || isLoading}
-                    className="rounded-full border border-zinc-700 p-2.5 text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-full border border-zinc-700 p-3 text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 sm:p-2.5"
                     aria-label={`Delete ${track.title}`}
                     title="Delete track"
                   >

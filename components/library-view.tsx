@@ -361,10 +361,10 @@ export function LibraryView({
   };
 
   return (
-    <main className="min-h-screen bg-black px-3 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-3 lg:p-4 lg:pb-32">
-      <div className="mx-auto w-full max-w-[1400px]">
-        <div className="grid gap-3 lg:grid-cols-[76px_minmax(0,1fr)] xl:grid-cols-[76px_minmax(0,1fr)_320px]">
-          <aside className="hidden h-[calc(100vh-150px)] flex-col rounded-2xl bg-zinc-950 p-3 lg:flex">
+    <main className="box-border h-dvh overflow-hidden bg-black px-2 pb-[calc(7.25rem+env(safe-area-inset-bottom))] pt-2 sm:px-3 sm:pt-3 lg:p-4 lg:pb-32">
+      <div className="mx-auto h-full w-full max-w-[1400px]">
+        <div className="grid h-full gap-2 sm:gap-3 lg:grid-cols-[76px_minmax(0,1fr)] xl:grid-cols-[76px_minmax(0,1fr)_320px]">
+          <aside className="hidden h-full min-h-0 flex-col rounded-2xl bg-zinc-950 p-3 lg:flex">
             <div className="mb-2">
               {canManage ? (
                 <button
@@ -379,7 +379,7 @@ export function LibraryView({
               ) : null}
             </div>
 
-            <div className="space-y-2 overflow-y-auto">
+            <div className="min-h-0 space-y-2 overflow-y-auto">
               <button
                 type="button"
                 onClick={() => handleSelectAlbum(null)}
@@ -430,19 +430,19 @@ export function LibraryView({
             </div>
           </aside>
 
-          <section className="min-h-[calc(100vh-190px)] overflow-y-auto rounded-2xl bg-gradient-to-b from-zinc-900 to-black p-4 md:p-5 lg:h-[calc(100vh-150px)] lg:min-h-0">
-            <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl bg-linear-to-b from-zinc-900 to-black p-3 sm:p-4 md:p-5">
+            <header className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-wide text-zinc-400">
                   Your music
                 </p>
-                <h1 className="text-2xl font-bold text-white">Library</h1>
+                <h1 className="text-xl font-bold text-white sm:text-2xl">Library</h1>
                 <p className="text-xs text-zinc-400">
                   {userEmail} - {selectedAlbumName}
                 </p>
               </div>
               {canManage ? (
-                <div className="flex items-center gap-2 self-start sm:self-auto">
+                <div className="flex w-full items-center gap-2 self-start sm:w-auto sm:self-auto">
                   <button
                     type="button"
                     onClick={() => setIsUploadModalOpen(true)}
@@ -454,7 +454,7 @@ export function LibraryView({
                     type="button"
                     onClick={handleSignOut}
                     disabled={isSigningOut}
-                    className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-full border border-zinc-700 px-3 py-2.5 text-xs font-medium text-zinc-200 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 sm:py-1.5"
                   >
                     {isSigningOut ? "Signing out..." : "Sign out"}
                   </button>
@@ -471,12 +471,12 @@ export function LibraryView({
             </header>
 
             <div className="mb-4 lg:hidden">
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <div className="flex flex-wrap gap-2">
                 {canManage ? (
                   <button
                     type="button"
                     onClick={() => setIsAlbumModalOpen(true)}
-                    className="shrink-0 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-200"
+                    className="shrink-0 rounded-xl bg-zinc-900 px-3 py-2.5 text-xs font-semibold text-zinc-200"
                   >
                     +
                   </button>
@@ -484,7 +484,7 @@ export function LibraryView({
                 <button
                   type="button"
                   onClick={() => handleSelectAlbum(null)}
-                  className={`shrink-0 rounded-lg px-3 py-2 text-xs transition ${
+                  className={`shrink-0 rounded-xl px-3 py-2.5 text-xs transition ${
                     selectedAlbumId === null
                       ? "bg-zinc-800 text-white"
                       : "bg-zinc-900 text-zinc-300"
@@ -497,12 +497,24 @@ export function LibraryView({
                     type="button"
                     key={`mobile-${album.id}`}
                     onClick={() => handleSelectAlbum(album.id)}
-                    className={`shrink-0 rounded-lg px-3 py-2 text-xs transition ${
+                    className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs transition ${
                       selectedAlbumId === album.id
                         ? "bg-zinc-800 text-white"
                         : "bg-zinc-900 text-zinc-300"
                     }`}
                   >
+                    {album.cover_signed_url ? (
+                      <Image
+                        src={album.cover_signed_url}
+                        alt={`${album.name} cover`}
+                        width={20}
+                        height={20}
+                        className="h-5 w-5 rounded object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <span className="text-[10px]">♪</span>
+                    )}
                     {album.name}
                   </button>
                 ))}
@@ -515,44 +527,46 @@ export function LibraryView({
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="What do you want to play?"
-                className="w-full rounded-full border border-zinc-800 bg-black px-4 py-2 text-sm text-zinc-100 outline-none ring-zinc-500 focus:ring-2"
+                className="w-full rounded-full border border-zinc-800 bg-black px-4 py-2.5 text-sm text-zinc-100 outline-none ring-zinc-500 focus:ring-2"
               />
-              <div className="flex gap-2 overflow-x-auto text-xs">
+              <div className="flex flex-wrap gap-2 text-xs">
                 <span className="rounded-full bg-white px-3 py-1 text-black">All</span>
                 <span className="rounded-full bg-zinc-800 px-3 py-1 text-zinc-200">Music</span>
                 <span className="rounded-full bg-zinc-800 px-3 py-1 text-zinc-200">Uploaded</span>
               </div>
             </div>
 
-            {libraryLoading ? (
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-sm text-zinc-300">
-                Loading tracks...
-              </div>
-            ) : (
-              <TrackList
-                tracks={filteredTracks}
-                currentTrackId={currentTrack?.id ?? null}
-                loadingTrackId={loadingTrackId}
-                deletingTrackId={deletingTrackId}
-                canDelete={canManage}
-                onPlay={handlePlay}
-                onDelete={handleDelete}
-              />
-            )}
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              {libraryLoading ? (
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-sm text-zinc-300">
+                  Loading tracks...
+                </div>
+              ) : (
+                <TrackList
+                  tracks={filteredTracks}
+                  currentTrackId={currentTrack?.id ?? null}
+                  loadingTrackId={loadingTrackId}
+                  deletingTrackId={deletingTrackId}
+                  canDelete={canManage}
+                  onPlay={handlePlay}
+                  onDelete={handleDelete}
+                />
+              )}
+            </div>
 
             {canManage && selectedAlbumId ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAddTracksModalOpen(true)}
-                  className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-900"
+                  className="rounded-full border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-100 hover:bg-zinc-900"
                 >
                   Add songs to album
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsEditAlbumModalOpen(true)}
-                  className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-900"
+                  className="rounded-full border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-100 hover:bg-zinc-900"
                 >
                   Edit album
                 </button>
@@ -566,7 +580,7 @@ export function LibraryView({
             ) : null}
           </section>
 
-          <aside className="hidden h-[calc(100vh-150px)] overflow-y-auto rounded-2xl bg-zinc-950 p-4 xl:block">
+          <aside className="hidden h-full min-h-0 overflow-y-auto rounded-2xl bg-zinc-950 p-4 xl:block">
             <h2 className="mb-3 text-sm font-semibold text-zinc-200">Now Playing</h2>
             <div className="rounded-xl bg-zinc-900 p-3">
               {currentTrack?.cover_signed_url ? (
